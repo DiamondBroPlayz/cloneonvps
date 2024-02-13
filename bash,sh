@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Define environment variables
+export VOL_DOWNLOAD=/mnt/temp/data
+export VOL_MOVIES=/mnt/temp/data/movies
+export VOL_SERIES=/mnt/temp/data/tv_series
+export VOL_PHOTOS=/mnt/temp/data/photos
+export VOL_OTHER=/mnt/temp/data/other
+
+# Create necessary directories
+mkdir -p ./plex/config ./plex/transcode
+mkdir -p ./transmission/config ./transmission/watch
+mkdir -p ./radarr/movies ./radarr/config
+mkdir -p ./sonarr/series ./sonarr/config
+
+# Create .env file
+echo "VOL_DOWNLOAD=${VOL_DOWNLOAD}" > .env
+echo "VOL_MOVIES=${VOL_MOVIES}" >> .env
+echo "VOL_SERIES=${VOL_SERIES}" >> .env
+echo "VOL_PHOTOS=${VOL_PHOTOS}" >> .env
+echo "VOL_OTHER=${VOL_OTHER}" >> .env
+
+# Create docker-compose.yml file
+cat <<EOL > docker-compose.yml
+version: '3'
+
+services:
+  # media server
+  plex:
+    image: linuxserver/plex
+    volumes:
+      - "./plex/config:/config"
+      - "\${VOL_SERIES}:/data/series"
+      - "\${VOL_MOVIES}:/data/movies"
+      - "\${VOL_OTHER}:/data/other"
+      - "\${VOL_PHOTOS}:/data/photos"
+      - "./plex/transcode:/transcode"
+      - "/etc/localtime:/etc/localtime:ro"
+    network_mode: "host"
+    restart: "unless-stopped"
+  # torrent downloader
+  transmission:
+    image: linuxserver/transmission
+    volumes:
+      - "./transmission/config:/config"
+      - "./transmission/watch:/watch"
+      - "\${VOL_DOWNLOAD}:/downloads"
+      - "\${VOL_MOVIES}:/downloads/movies"
+      - "\${VOL_SERIES}:/downloads/series"
+      - "\${VOL_OTHER}:/downloads/other"
+      - "/etc/localtime:/etc/localtime:ro"
+    network_mode: "host"
+    restart: "unless-stopped"
+  # movie search
+  radarr:
+    image: linuxserver/radarr
+    volumes:
+      - "\${VOL_DOWNLOAD}:/downloads"
+      - "\${VOL_MOVIES}:/downloads/movies"
+      - "./radarr/movies:/movies"
+      - "./radarr/config:/config"
+      - "/etc/localtime:/etc/localtime:ro"
+    ports:
+      - "7878:7878"
+    restart: "unless-stopped"
+  # tv series search
+  sonarr:
+    image: linuxserver/sonarr
+    volumes:
+      - "\${VOL_DOWNLOAD}:/downloads"
+      - "\${VOL_SERIES}:/downloads/series"
+      - "./sonarr/series:/tv"
+      - "./sonarr/config:/config"
+      - "/etc/localtime:/etc/localtime:ro"
+    ports:
+      - "8989:8989"
+    restart: "unless-stopped"
+EOL
+
+# Display installation instructions
+echo "Home Media Stack installation script completed!"
+echo "Please follow these instructions to complete the setup:"
+echo "1. Run 'docker-compose up -d' to start the stack."
+echo "2. Wait 1-5 minutes for the services to initialize."
+echo "3. Access the services using the following URLs:"
+echo "   - Plex: http://<your-docker-host-ip>:32400/web"
+echo "   - Transmission: http://<your-docker-host-ip>:9091"
+echo "   - Radarr: http://<your-docker-host-ip>:7878"
+echo "   - Sonarr: http://<your-docker-host-ip>:8989"
+echo "4. Follow the 'Setup' instructions for Plex, Transmission, Sonarr, and Radarr provided in the original documentation."
